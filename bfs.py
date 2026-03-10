@@ -44,7 +44,6 @@ queue_snap = deque()
 # 2D array's element can be list array, etc..
 # print(len(grid))
 
-
 # Define Function
 def breadth_first_search(row, column, steps):
     snapshots = []
@@ -121,10 +120,6 @@ def finding_start_end():
                 start = (row,column)
                 queue.append((row,column,0))
                 steps, queue_max, expanded_amount, frontier, snapshots = breadth_first_search(row,column,0)
-                frontier = [node[:2] for node in frontier]
-                frontier_file = open("frontier.json", "w")
-                json.dump(list(frontier), frontier_file)
-                frontier_file.close()
                 print("Steps, Queue_max, Amount of Expanded Point, Frontier:",steps,queue_max,expanded_amount,frontier)
             elif grid[row][column] == "E":
                 end = [(row,column)]
@@ -135,15 +130,11 @@ def finding_start_end():
 #Info
 finding_start_end()
 
-
 path.reverse()
 print("The Shortest Path:", path)
 
 file = open("path.json", "w")
-expanded_file = open("expanded.json", "w")
-
 json.dump(list(path), file)
-json.dump(list(visited), expanded_file)
 
 file.close()
 print()

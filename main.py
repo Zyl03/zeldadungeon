@@ -172,12 +172,6 @@ async def main():
     with open("data/path.json", "r") as file:
         path = json.load(file)
 
-    with open("data/frontier.json", "r") as frontier_file:
-        frontier = json.load(frontier_file)
-
-    with open("data/expanded.json", "r") as expanded_file:
-        expanded = json.load(expanded_file)
-
     running = True
 
     while running:
