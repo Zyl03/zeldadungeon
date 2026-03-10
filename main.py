@@ -2,7 +2,7 @@ import pygame
 import json
 import asyncio
 import os
-
+from bfs import breadth_first_search
 
 grid = [
 list("#########################"),
@@ -96,15 +96,15 @@ legend_lines = [
 
 controls_lines = [
     "Arrows = Move",
-    "V = Toggle Visited",
+    "Space = Animation",
     "P = Toggle Path",
     "R = Reset"
 ]
 
 stats_lines = [
-    f"Path Length: {70}",
-    f"Visited: {80}",
-    f"Frontier: {90}"
+     f"Path Length: {70}",
+     f"Visited: {80}",
+     f"Frontier: {90}"
 ]
 
 def find_start(g):
@@ -157,17 +157,26 @@ def draw_centered_lines(screen, lines, font, color, center_x, start_y, line_gap)
         rect = surf.get_rect(center=(center_x, start_y + i * line_gap))
         screen.blit(surf, rect)
 
-def main():
+async def main():
     clock = pygame.time.Clock()
 
     player_pos = find_start(grid)
 
-    file = open("path.json", "r")
-    path = json.load(file)
-    frontier_file = open("frontier.json", "r")
-    frontier = json.load(frontier_file )
-    expanded_file = open("expanded.json", "r")
-    expanded = json.load(expanded_file)
+    snapshots = []
+    frame_index = 0
+    animating = False
+    last_frame_time = 0
+    frame_delay = 300
+    show_solution = False
+
+    with open("data/path.json", "r") as file:
+        path = json.load(file)
+
+    with open("data/frontier.json", "r") as frontier_file:
+        frontier = json.load(frontier_file)
+
+    with open("data/expanded.json", "r") as expanded_file:
+        expanded = json.load(expanded_file)
 
     running = True
 
@@ -176,44 +185,62 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
             if event.type == pygame.KEYDOWN:
+                row, col = player_pos
                 if event.key == pygame.K_DOWN:
-                    row, col = player_pos
                     player_pos = (row + 1, col)
                 if event.key == pygame.K_UP:
-                    row, col = player_pos
                     player_pos = (row - 1, col)
                 if event.key == pygame.K_LEFT:
-                    row, col = player_pos
                     player_pos = (row, col - 1)
                 if event.key == pygame.K_RIGHT:
-                    row, col = player_pos
                     player_pos = (row, col + 1)
-        
-        
+                if event.key == pygame.K_SPACE:
+                     steps, queue_max, expanded_count, queue_snap,snapshots = breadth_first_search(player_pos[0], player_pos[1], 0)
+                     frame_index = 0
+                     animating = len(snapshots) > 0
+                     last_frame_time = pygame.time.get_ticks()
+                if event.key == pygame.K_p:
+                    show_solution = not show_solution
+    
+        if animating and len(snapshots) > 0 and frame_index < len(snapshots) - 1:
+            now = pygame.time.get_ticks()
+            if now - last_frame_time > frame_delay:
+                frame_index += 1
+                last_frame_time = now
+
         screen.fill((30, 30, 30))
         draw_grid(screen, grid, 0, 0)
         draw_player(screen, player_pos, 0, 0)
-        
-        draw_overlay_cells(screen, frontier, (80, 170, 255), TILE_SIZE, alpha=140)  
-        draw_overlay_cells(screen, path, (0, 255, 120), TILE_SIZE, alpha=120)  
-        draw_overlay_cells(screen, expanded, (255, 80, 80), TILE_SIZE, alpha=50)
-    
+
+        if show_solution:
+            draw_overlay_cells(screen, path, (0,255,120), TILE_SIZE, alpha=120)
+
+        if animating and len(snapshots) > 0:
+                frame = snapshots[frame_index]
+                visited = frame["visited"]
+                current_frontier = frame["frontier"]
+                current = frame["current"]
+
+                draw_overlay_cells(screen, visited, (255, 80, 80), TILE_SIZE, alpha=70)
+                draw_overlay_cells(screen, current_frontier, (80, 170, 255), TILE_SIZE, alpha=180)
+                draw_overlay_cells(screen, [current], (255, 255, 0), TILE_SIZE, alpha=230)
+
         pygame.draw.rect(screen, (25, 25, 25), (ui_x, 0, UI_WIDTH, HEIGHT))
-        pygame.draw.line(screen, (80,80,80), (ui_x,0), (ui_x,HEIGHT), 2)
+        pygame.draw.line(screen, (80, 80, 80), (ui_x, 0), (ui_x, HEIGHT), 2)
 
         screen.blit(panel_bg, (WIDTH, 0))
 
         panel_center_x = WIDTH + UI_WIDTH // 2
-
         draw_centered_lines(screen, legend_lines, legend_font, TEXT_COLOR, panel_center_x, 200, 25)
         draw_centered_lines(screen, controls_lines, legend_font, TEXT_COLOR, panel_center_x, 400, 25)
         draw_centered_lines(screen, stats_lines, stats_font, TEXT_COLOR, panel_center_x, 600, 25)
 
         pygame.display.flip()
-
         clock.tick(60)
-    file.close()
+
+        await asyncio.sleep(0)
+
     pygame.quit()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
