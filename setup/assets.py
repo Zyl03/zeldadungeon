@@ -53,6 +53,8 @@ font_path = os.path.join("fonts", "Cinzel-Regular.ttf")
 legend_font = pygame.font.Font(font_path, 20)
 stats_font = pygame.font.Font(font_path, 20)
 
+# Converts the image to a format optimized for the current display
+# Preserves transparent pixels (alpha channel)
 wall_img = pygame.image.load("image/wall.png").convert_alpha()
 player_img = pygame.image.load("image/player.png").convert_alpha()
 road_img = pygame.image.load("image/road.png").convert_alpha()

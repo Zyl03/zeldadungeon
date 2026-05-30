@@ -3,9 +3,9 @@ import json
 import asyncio
 import os
 
-from bfs import *
-from render import *
-from assets import *
+from setup.bfs import *
+from setup.render import *
+from setup.assets import *
 
 import copy
 
