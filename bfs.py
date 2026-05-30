@@ -38,7 +38,6 @@ visited= set()
 parent = {}
 queue = deque()
 path = deque()
-queue_snap = deque()
 
 # The length of 2D array will tell us how many elements in the array
 # 2D array's element can be list array, etc..
@@ -63,8 +62,6 @@ def breadth_first_search(row, column, steps):
     })
 
     expanded = 0
-    queue_max = len(queue)
-    queue_snap = deque()
     directions = [(-1,0), (0,-1), (1,0), (0,1)]
     terrain = {'.', 'E', 'F', 'M', '~', 'S'}
 
@@ -72,7 +69,7 @@ def breadth_first_search(row, column, steps):
         row, column, steps = queue.popleft()
 
         if grid[row][column] == 'E':
-            return steps, queue_max, expanded, queue_snap, snapshots
+            return steps, expanded, snapshots
 
         expanded += 1
 
@@ -87,10 +84,6 @@ def breadth_first_search(row, column, steps):
                 parent[(new_row, new_column)] = (row, column)
                 queue.append((new_row, new_column, steps + 1))
 
-                if len(queue) > queue_max:
-                    queue_snap = queue.copy()
-                    queue_max = len(queue)
-
         # Frame after expanding this node
         snapshots.append({
             "current": (row, column),
@@ -98,7 +91,8 @@ def breadth_first_search(row, column, steps):
             "frontier": [(r, c) for (r, c, _) in queue]
         })
 
-    return -1, queue_max, expanded, queue_snap, snapshots
+    return -1,  expanded, snapshots
+
 def path_finding(end):
     temp = end
     path.append(end)
@@ -119,8 +113,8 @@ def finding_start_end():
             if grid[row][column] == "S":
                 start = (row,column)
                 queue.append((row,column,0))
-                steps, queue_max, expanded_amount, frontier, snapshots = breadth_first_search(row,column,0)
-                print("Steps, Queue_max, Amount of Expanded Point, Frontier:",steps,queue_max,expanded_amount,frontier)
+                steps, expanded_amount, snapshots = breadth_first_search(row,column,0)
+                print("Steps, Amount of Expanded Point, Frontier:",steps,expanded_amount)
             elif grid[row][column] == "E":
                 end = [(row,column)]
     print("Start at:",start)

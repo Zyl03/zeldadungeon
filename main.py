@@ -3,6 +3,7 @@ import json
 import asyncio
 import os
 from bfs import breadth_first_search
+import copy
 
 grid = [
 list("#########################"),
@@ -32,6 +33,7 @@ list("#...#.....#.....#...#..E#"),
 list("#########################"),
 ]
 
+original_grid = copy.deepcopy(grid)
 ROWS = len(grid)
 COLS = len(grid[0])
 
@@ -101,12 +103,6 @@ controls_lines = [
     "R = Reset"
 ]
 
-stats_lines = [
-     f"Path Length: {70}",
-     f"Visited: {80}",
-     f"Frontier: {90}"
-]
-
 def find_start(g):
     for r in range(len(g)):
         for c in range(len(g[0])):
@@ -157,81 +153,213 @@ def draw_centered_lines(screen, lines, font, color, center_x, start_y, line_gap)
         rect = surf.get_rect(center=(center_x, start_y + i * line_gap))
         screen.blit(surf, rect)
 
+def dash_board():
+     pygame.draw.rect(screen, (25, 25, 25), (ui_x, 0, UI_WIDTH, HEIGHT))
+     pygame.draw.line(screen, (80, 80, 80), (ui_x, 0), (ui_x, HEIGHT), 2)
+     screen.blit(panel_bg, (WIDTH, 0))
+     panel_center_x = WIDTH + UI_WIDTH // 2
+     draw_centered_lines(screen, legend_lines, legend_font, TEXT_COLOR, panel_center_x, 200, 25)
+     draw_centered_lines(screen, controls_lines, legend_font, TEXT_COLOR, panel_center_x, 400, 25)
+
 async def main():
     clock = pygame.time.Clock()
 
     player_pos = find_start(grid)
+    player_hp = 100
+    food_count = 0
+    moves_made = 0
+
+    game_over = False
+    win = False
 
     snapshots = []
     frame_index = 0
-    animating = False
+    path_frame = 0
     last_frame_time = 0
-    frame_delay = 300
-    show_solution = False
+    frame_delay = 100
 
+    animating = False
+    animating_path = False
+    show_solution = False
+    running = True
+
+    panel_center_x = WIDTH + UI_WIDTH // 2
+    
+    stats_lines = [
+                        f"Path Length: {0}",
+                        f"Visited: {0}",
+                        f"HP: {player_hp}",
+                        f"Food: {food_count}",
+                    ]
+    
     with open("data/path.json", "r") as file:
         path = json.load(file)
 
-    running = True
-
     while running:
+        
+        # --------------------
+        # 1. handle events
+        # --------------------
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+
             if event.type == pygame.KEYDOWN:
-                row, col = player_pos
+                if game_over:
+                    continue
+                r, c = player_pos
+                nr, nc = r, c
                 if event.key == pygame.K_DOWN:
-                    player_pos = (row + 1, col)
+                    nr += 1
                 if event.key == pygame.K_UP:
-                    player_pos = (row - 1, col)
+                    nr -= 1
                 if event.key == pygame.K_LEFT:
-                    player_pos = (row, col - 1)
+                    nc -= 1
                 if event.key == pygame.K_RIGHT:
-                    player_pos = (row, col + 1)
+                    nc += 1
+
+                if (nr, nc) != (r, c):
+                    if 0 <= nr < ROWS and 0 <= nc < COLS:
+                        if grid[nr][nc] != "#":
+                            player_pos = (nr, nc)
+                            moves_made += 1
+                    steps, expanded_count, _ = breadth_first_search(
+                        player_pos[0],
+                        player_pos[1],
+                        0
+                    )
+
+                r, c = player_pos
+                if grid[r][c] == "F":
+                    player_hp = min(100, player_hp + 20)
+                    food_count += 1
+                    grid[r][c] = "."
+
+                if grid[r][c] == "M":
+                    player_hp -= 25
+
+                if grid[r][c] == "E":
+                    win = True
+                    game_over = True
+                
+                if grid[r][c] == "~":
+                    player_hp -= 5
+
+                if player_hp <= 0:
+                    game_over = True
+
                 if event.key == pygame.K_SPACE:
-                     steps, queue_max, expanded_count, queue_snap,snapshots = breadth_first_search(player_pos[0], player_pos[1], 0)
-                     frame_index = 0
-                     animating = len(snapshots) > 0
-                     last_frame_time = pygame.time.get_ticks()
+                    steps,  expanded_count, snapshots = breadth_first_search(
+                        player_pos[0], player_pos[1], 0
+                    )
+                    frame_index = 0
+                    path_frame = 0
+                    animating = len(snapshots) > 0
+                    animating_path = False
+                    last_frame_time = pygame.time.get_ticks()
+
                 if event.key == pygame.K_p:
                     show_solution = not show_solution
-    
-        if animating and len(snapshots) > 0 and frame_index < len(snapshots) - 1:
-            now = pygame.time.get_ticks()
-            if now - last_frame_time > frame_delay:
-                frame_index += 1
-                last_frame_time = now
 
+                if event.key == pygame.K_r:
+                    grid[:] = copy.deepcopy(original_grid)
+
+                    player_pos = find_start(grid)
+
+                    player_hp = 100
+                    food_count = 0
+                    moves_made = 0
+
+                    steps = 0
+                    expanded_count = 0
+
+                    game_over = False
+                    win = False
+
+                    snapshots = []
+                    frame_index = 0
+                    path_frame = 0
+
+                    animating = False
+                    animating_path = False
+                    show_solution = False
+
+                    stats_lines = [
+                        f"Path Length: {0}",
+                        f"Visited: {0}",
+                        f"HP: {player_hp}",
+                        f"Heart: {food_count}",
+                    ]
+
+        now = pygame.time.get_ticks()
+
+        # Stage 1: expanded/frontier animation
+        if animating and len(snapshots) > 0:
+            if now - last_frame_time > frame_delay:
+                if frame_index < len(snapshots) - 1:
+                    frame_index += 1
+                    last_frame_time = now
+                else:
+                    animating = False
+                    animating_path = True
+                    path_frame = 0
+                    last_frame_time = now
+
+        # Stage 2: backtracking animation
+        elif animating_path:
+            if now - last_frame_time > 120:
+                if path_frame < len(path):
+                    path_frame += 1
+                    last_frame_time = now
+                else:
+                    animating_path = False
+
+        # --------------------
+        # 3. draw
+        # --------------------
         screen.fill((30, 30, 30))
         draw_grid(screen, grid, 0, 0)
         draw_player(screen, player_pos, 0, 0)
 
+        # Show full solution if toggled
         if show_solution:
-            draw_overlay_cells(screen, path, (0,255,120), TILE_SIZE, alpha=120)
+            draw_overlay_cells(screen, path, (0, 255, 120), TILE_SIZE, alpha=120)
 
-        if animating and len(snapshots) > 0:
-                frame = snapshots[frame_index]
-                visited = frame["visited"]
-                current_frontier = frame["frontier"]
-                current = frame["current"]
+        # Draw BFS snapshots
+        if len(snapshots) > 0 and frame_index < len(snapshots):
+            frame = snapshots[frame_index]
+            visited = frame["visited"]
+            current_frontier = frame["frontier"]
+            current = frame["current"]
 
-                draw_overlay_cells(screen, visited, (255, 80, 80), TILE_SIZE, alpha=70)
-                draw_overlay_cells(screen, current_frontier, (80, 170, 255), TILE_SIZE, alpha=180)
-                draw_overlay_cells(screen, [current], (255, 255, 0), TILE_SIZE, alpha=230)
+            draw_overlay_cells(screen, visited, (255, 80, 80), TILE_SIZE, alpha=70)
+            draw_overlay_cells(screen, current_frontier, (80, 170, 255), TILE_SIZE, alpha=180)
+            draw_overlay_cells(screen, [current], (255, 255, 0), TILE_SIZE, alpha=230)
+    
+        # Draw path step by step
+        if animating_path or path_frame > 0:
+            draw_overlay_cells(screen, path[:path_frame], (0, 255, 120), TILE_SIZE, alpha=180)
+        
+        stats_lines = [
+            f"Moves: {moves_made}",
+            f"Path Length: {steps if 'steps' in locals() else 0}",
+            f"HP: {player_hp}",
+            f"Heart: {food_count}",
+        ]
 
-        pygame.draw.rect(screen, (25, 25, 25), (ui_x, 0, UI_WIDTH, HEIGHT))
-        pygame.draw.line(screen, (80, 80, 80), (ui_x, 0), (ui_x, HEIGHT), 2)
-
-        screen.blit(panel_bg, (WIDTH, 0))
-
-        panel_center_x = WIDTH + UI_WIDTH // 2
-        draw_centered_lines(screen, legend_lines, legend_font, TEXT_COLOR, panel_center_x, 200, 25)
-        draw_centered_lines(screen, controls_lines, legend_font, TEXT_COLOR, panel_center_x, 400, 25)
+        dash_board()
         draw_centered_lines(screen, stats_lines, stats_font, TEXT_COLOR, panel_center_x, 600, 25)
+        if win:
+                    font = pygame.font.SysFont(None, 80)
+                    text = font.render("YOU WIN!", True, (0, 255, 0))
+                    screen.blit(text, (WIDTH//2 - 150, HEIGHT//2))
 
+        if game_over and not win:
+                    font = pygame.font.SysFont(None, 80)
+                    text = font.render("GAME OVER", True, (255, 0, 0))
+                    screen.blit(text, (WIDTH//2 - 180, HEIGHT//2))
         pygame.display.flip()
         clock.tick(60)
-
         await asyncio.sleep(0)
 
     pygame.quit()
